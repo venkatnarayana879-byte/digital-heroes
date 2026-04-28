@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -48,14 +49,12 @@ export default function Dashboard() {
       return
     }
 
-    // Check existing scores count
     const { data: existing } = await supabase
       .from('scores')
       .select('*')
       .eq('user_id', profile.id)
       .order('score_date', { ascending: true })
 
-    // If 5 scores exist, delete oldest
     if (existing && existing.length >= 5) {
       await supabase.from('scores').delete().eq('id', existing[0].id)
     }
@@ -69,7 +68,7 @@ export default function Dashboard() {
     if (error) {
       setScoreError(error.message.includes('unique') ? 'Score already exists for this date!' : error.message)
     } else {
-      setScoreSuccess('Score added!')
+      setScoreSuccess('Score added successfully!')
       setScoreForm({ score: '', score_date: '' })
       loadData()
     }
@@ -92,7 +91,7 @@ export default function Dashboard() {
       <nav className="flex items-center justify-between px-8 py-5 border-b border-white/10">
         <div className="text-white font-bold text-xl">⛳ Digital Heroes</div>
         <div className="flex items-center gap-4">
-          <span className="text-slate-300 text-sm">{profile?.email}</span>
+          <span className="text-slate-300 text-sm hidden md:block">{profile?.email}</span>
           <button onClick={handleLogout} className="text-slate-400 hover:text-white transition text-sm">Logout</button>
         </div>
       </nav>
@@ -106,10 +105,13 @@ export default function Dashboard() {
             {profile?.subscription_status || 'inactive'}
           </div>
           <p className="text-slate-300 text-sm">Plan: {profile?.subscription_plan || 'No active plan'}</p>
+          {profile?.subscription_end_date && (
+            <p className="text-slate-400 text-xs mt-1">Expires: {new Date(profile.subscription_end_date).toLocaleDateString('en-IN')}</p>
+          )}
           {profile?.subscription_status !== 'active' && (
-            <button className="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl text-sm transition">
-              Subscribe Now
-            </button>
+            <Link href="/subscription" className="mt-4 inline-block bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl text-sm transition">
+              Subscribe Now →
+            </Link>
           )}
         </div>
 
@@ -118,6 +120,11 @@ export default function Dashboard() {
           <h2 className="text-white font-bold text-lg mb-4">❤️ Your Charity</h2>
           <p className="text-white font-medium">{profile?.charities?.name || 'No charity selected'}</p>
           <p className="text-slate-300 text-sm mt-2">Contribution: {profile?.charity_contribution_percent || 10}% of subscription</p>
+          {profile?.subscription_status === 'active' && (
+            <div className="mt-3 bg-green-500/10 rounded-xl px-4 py-2">
+              <p className="text-green-300 text-sm">✅ Contributing actively</p>
+            </div>
+          )}
         </div>
 
         {/* Score Entry */}
@@ -125,7 +132,7 @@ export default function Dashboard() {
           <h2 className="text-white font-bold text-lg mb-4">🏌️ Add Score</h2>
           <form onSubmit={handleAddScore} className="space-y-3">
             <input
-              type="number" placeholder="Score (1-45)" min="1" max="45" required
+              type="number" placeholder="Stableford Score (1-45)" min="1" max="45" required
               className="w-full bg-white/10 text-white placeholder-slate-400 px-4 py-3 rounded-xl border border-white/20 focus:outline-none focus:border-purple-400"
               value={scoreForm.score} onChange={e => setScoreForm({...scoreForm, score: e.target.value})}
             />
@@ -152,17 +159,41 @@ export default function Dashboard() {
               {scores.map((s, i) => (
                 <div key={s.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
                   <span className="text-slate-300 text-sm">{new Date(s.score_date).toLocaleDateString('en-IN')}</span>
-                  <span className={`font-bold text-lg ${i === 0 ? 'text-purple-400' : 'text-white'}`}>{s.score}</span>
+                  <div className="flex items-center gap-2">
+                    {i === 0 && <span className="text-xs text-purple-400">Latest</span>}
+                    <span className={`font-bold text-lg ${i === 0 ? 'text-purple-400' : 'text-white'}`}>{s.score}</span>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Draw Participation */}
+        {/* Draw Section */}
         <div className="bg-white/10 backdrop-blur rounded-2xl p-6 md:col-span-2">
-          <h2 className="text-white font-bold text-lg mb-4">🏆 Monthly Draw</h2>
-          <p className="text-slate-300">Next draw results will be published by admin. Keep tracking your scores to participate!</p>
+          <h2 className="text-white font-bold text-lg mb-4">🏆 Monthly Prize Draw</h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-yellow-500/10 rounded-xl p-4 text-center">
+              <div className="text-2xl mb-2">🥇</div>
+              <p className="text-yellow-300 font-bold">Jackpot (5 match)</p>
+              <p className="text-slate-300 text-sm mt-1">40% of prize pool</p>
+            </div>
+            <div className="bg-slate-500/10 rounded-xl p-4 text-center">
+              <div className="text-2xl mb-2">🥈</div>
+              <p className="text-slate-300 font-bold">4 Match</p>
+              <p className="text-slate-300 text-sm mt-1">35% of prize pool</p>
+            </div>
+            <div className="bg-orange-500/10 rounded-xl p-4 text-center">
+              <div className="text-2xl mb-2">🥉</div>
+              <p className="text-orange-300 font-bold">3 Match</p>
+              <p className="text-slate-300 text-sm mt-1">25% of prize pool</p>
+            </div>
+          </div>
+          <p className="text-slate-400 text-sm mt-4 text-center">
+            {profile?.subscription_status === 'active' 
+              ? '✅ You are eligible for this month\'s draw!' 
+              : '⚠️ Subscribe to enter monthly draws'}
+          </p>
         </div>
 
       </div>
